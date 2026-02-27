@@ -319,7 +319,13 @@
     const REPO  = "smokerecipes";
 
     // Files we do NOT want to show as recipe cards
-    const EXCLUDE = new Set(["index.html"]);
+    const EXCLUDE = new Set([
+      
+     "index.html",
+     "about.html",
+     "privacy-policy.html",
+     "terms-of-service.html"
+    ]);
 
     function titleFromFilename(name){
       const base = name.replace(/\.html$/i, "");
@@ -401,7 +407,10 @@
         grid.innerHTML = htmlFiles.map(makeCard).join("");
 
         // also add those pages to footer (after fixed links)
-        footer.innerHTML += htmlFiles.map(makeFooterLink).join("");
+        footer.innerHTML += htmlFiles
+          .filter(name => !EXCLUDE.has(name))
+          .map(makeFooterLink)
+          .join("");
 
       }catch(err){
         grid.innerHTML = `
