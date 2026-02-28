@@ -420,3 +420,115 @@
   </script>
 </body>
 </html>
+<!-- FOOTER LINKS -->
+<div class="footerBar" id="footerLinks"></div>
+
+<div style="margin-top:14px; color:rgba(255,255,255,.68); text-align:center">
+  © <span id="y"></span> Smoke Recipes
+</div>
+
+<script>
+  document.getElementById("y").textContent = new Date().getFullYear();
+
+  const OWNER = "lmodir-max";
+  const REPO  = "smokerecipes";
+
+  // These pages should NOT show in recipes section
+  const EXCLUDE = new Set([
+    "index.html",
+    "about.html",
+    "privacy-policy.html",
+    "terms-of-service.html"
+  ]);
+
+  function titleFromFilename(name){
+    const base = name.replace(/\.html$/i, "");
+    const words = base.split("-").filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1));
+    return words.join(" ");
+  }
+
+  function iconFor(name){
+    const n = name.toLowerCase();
+    if (n.includes("pasta")) return "🍝";
+    if (n.includes("bbq") || n.includes("smoke") || n.includes("grill")) return "🔥";
+    if (n.includes("chicken")) return "🍗";
+    if (n.includes("salad")) return "🥗";
+    if (n.includes("dessert") || n.includes("cake")) return "🍰";
+    return "🍳";
+  }
+
+  function makeCard(fileName){
+    const title = titleFromFilename(fileName);
+    const icon = iconFor(fileName);
+    return `
+      <a class="card recipe" href="${fileName}">
+        <div class="arrow">→</div>
+        <div class="thumb">${icon}</div>
+        <h3>${title}</h3>
+        <div class="meta">View recipe</div>
+        <div class="pillRow">
+          <span class="pill">Recipe</span>
+          <span class="pill">Easy</span>
+          <span class="pill">Tasty</span>
+        </div>
+      </a>
+    `;
+  }
+
+  function makeFooterLink(fileName){
+    const title = titleFromFilename(fileName);
+    return `<a href="${fileName}">${title}</a>`;
+  }
+
+  async function loadPages(){
+    const grid = document.getElementById("recipesGrid");
+    const footer = document.getElementById("footerLinks");
+
+    // Footer fixed links (these are your menu links)
+    const fixed = [
+      { label: "About Me", href: "about.html" },
+      { label: "Privacy Policy", href: "privacy-policy.html" },
+      { label: "Terms Of Service", href: "terms-of-service.html" }
+    ];
+
+    footer.innerHTML = fixed.map(x => `<a href="${x.href}">${x.label}</a>`).join("");
+
+    try{
+      const api = `https://api.github.com/repos/${OWNER}/${REPO}/contents`;
+      const res = await fetch(api, { headers: { "Accept":"application/vnd.github+json" }});
+      if(!res.ok) throw new Error("API error: " + res.status);
+
+      const data = await res.json();
+
+      // Only show recipe pages (exclude legal pages)
+      const htmlFiles = data
+        .filter(x => x.type === "file" && /\.html$/i.test(x.name))
+        .map(x => x.name)
+        .filter(name => !EXCLUDE.has(name))
+        .sort((a,b) => a.localeCompare(b));
+
+      if(htmlFiles.length === 0){
+        grid.innerHTML = `
+          <div class="card" style="padding:16px; grid-column: 1 / -1;">
+            No recipes found yet. Add a file like <b>my-new-recipe.html</b>.
+          </div>`;
+        return;
+      }
+
+      // Render recipe cards
+      grid.innerHTML = htmlFiles.map(makeCard).join("");
+
+      // Optional: also add recipe links to footer after fixed links
+      footer.innerHTML += htmlFiles.map(makeFooterLink).join("");
+
+    }catch(err){
+      grid.innerHTML = `
+        <div class="card" style="padding:16px; grid-column: 1 / -1;">
+          Recipes could not load. Refresh the page.<br/>
+          <span style="color:rgba(255,255,255,.68)">${String(err)}</span>
+        </div>`;
+    }
+  }
+
+  loadPages();
+</script>
