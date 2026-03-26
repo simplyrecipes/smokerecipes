@@ -123,7 +123,6 @@
       grid-template-rows: 1fr auto;
     }
     .visual{
-      padding:22px;
       background:
         radial-gradient(600px 250px at 30% 10%, rgba(255,100,0,.35), transparent 60%),
         radial-gradient(450px 240px at 90% 40%, rgba(255,179,138,.22), transparent 60%),
@@ -131,6 +130,7 @@
       border-bottom:1px solid var(--border);
       min-height:220px;
       position:relative;
+      overflow:hidden;
     }
     .badge{
       position:absolute; right:18px; top:18px;
@@ -140,6 +140,7 @@
       border:1px solid var(--border);
       color:var(--muted);
       font-weight:700;
+      z-index:2;
     }
     .bigIcon{
       width:100%;
@@ -148,6 +149,60 @@
       place-items:center;
       font-size:64px;
       opacity:.95;
+    }
+    .featuredLink{
+      position:absolute;
+      inset:0;
+      display:block;
+    }
+    .featuredImage{
+      position:absolute;
+      inset:0;
+      background-size:cover;
+      background-position:center;
+      transform:scale(1.02);
+    }
+    .featuredImage::after{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:
+        linear-gradient(180deg, rgba(8,12,20,.05) 0%, rgba(8,12,20,.1) 32%, rgba(8,12,20,.78) 100%);
+    }
+    .featuredFallback{
+      width:100%;
+      height:100%;
+      display:grid;
+      place-items:center;
+      font-size:64px;
+      color:rgba(255,255,255,.92);
+    }
+    .featuredCopy{
+      position:absolute;
+      left:18px;
+      right:18px;
+      bottom:18px;
+      z-index:1;
+      display:grid;
+      gap:6px;
+    }
+    .featuredEyebrow{
+      color:rgba(255,255,255,.7);
+      font-size:12px;
+      font-weight:800;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+    .featuredTitle{
+      margin:0;
+      font-size:22px;
+      line-height:1.15;
+      letter-spacing:-.3px;
+    }
+    .featuredMeta{
+      color:rgba(255,255,255,.78);
+      font-size:13px;
+      font-weight:700;
     }
     .miniStats{
       display:grid;
@@ -177,6 +232,20 @@
       display:grid;
       grid-template-columns: repeat(3, 1fr);
       gap:14px;
+    }
+    .pager{
+      margin-top:18px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .pageInfo{
+      color:var(--muted);
+      font-size:14px;
+      font-weight:700;
+      padding:10px 14px;
     }
 
     .recipe{
@@ -279,7 +348,7 @@
       </div>
 
       <div class="card heroSide">
-        <div class="visual">
+        <div class="visual" id="featuredVisual">
           <div class="badge">Featured</div>
           <div class="bigIcon">🍳🔥</div>
         </div>
@@ -301,6 +370,7 @@
 
     <!-- AUTO GENERATED CARDS -->
     <div class="grid" id="recipesGrid"></div>
+    <div class="pager" id="recipesPager"></div>
 
     <!-- FOOTER LINKS -->
     <div class="footerBar" id="footerLinks"></div>
@@ -315,6 +385,7 @@
 
     const OWNER = "lmodir-max";
     const REPO  = "smokerecipes";
+    const PAGE_SIZE = 15;
 
     // These pages should NOT show in recipes section
     const EXCLUDE = new Set([
@@ -329,6 +400,25 @@
       const base = name.replace(/\.html$/i, "");
       const words = base.split("-").filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1));
       return words.join(" ");
+    }
+
+    function escapeHtml(text){
+      return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function currentPage(totalPages){
+      const raw = Number(new URLSearchParams(window.location.search).get("page"));
+      if(!Number.isFinite(raw) || raw < 1) return 1;
+      return Math.min(Math.floor(raw), totalPages);
+    }
+
+    function pageHref(page){
+      return `?page=${page}#recipes`;
     }
 
     function iconFor(name){
@@ -418,6 +508,60 @@
       }
     }
 
+    function renderFeatured(card){
+      const visual = document.getElementById("featuredVisual");
+      if(!visual) return;
+      if(!card){
+        visual.innerHTML = `
+          <div class="badge">Featured</div>
+          <div class="bigIcon">SMOKE</div>
+        `;
+        return;
+      }
+
+      const title = escapeHtml(titleFromFilename(card.fileName));
+      const meta = escapeHtml(card.metaText);
+      const image = card.imageSrc
+        ? `<div class="featuredImage" style="background-image:url('${card.imageSrc.replace(/'/g, "%27")}');"></div>`
+        : `<div class="featuredFallback">${escapeHtml(iconFor(card.fileName))}</div>`;
+
+      visual.innerHTML = `
+        <div class="badge">Featured</div>
+        <a class="featuredLink" href="${card.href}">
+          ${image}
+          <div class="featuredCopy">
+            <div class="featuredEyebrow">Smoke Recipes Pick</div>
+            <h3 class="featuredTitle">${title}</h3>
+            <div class="featuredMeta">${meta}</div>
+          </div>
+        </a>
+      `;
+    }
+
+    function renderPager(totalItems, page){
+      const pager = document.getElementById("recipesPager");
+      if(!pager) return;
+
+      const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+      if(totalPages <= 1){
+        pager.innerHTML = "";
+        return;
+      }
+
+      const prev = page > 1
+        ? `<a class="btn" href="${pageHref(page - 1)}">Previous page</a>`
+        : `<span class="btn" style="opacity:.45; pointer-events:none;">Previous page</span>`;
+      const next = page < totalPages
+        ? `<a class="btn primary" href="${pageHref(page + 1)}">Next page</a>`
+        : `<span class="btn primary" style="opacity:.45; pointer-events:none;">Next page</span>`;
+
+      pager.innerHTML = `
+        ${prev}
+        <div class="pageInfo">Page ${page} of ${totalPages}</div>
+        ${next}
+      `;
+    }
+
     async function loadPages(){
       const grid = document.getElementById("recipesGrid");
       const footer = document.getElementById("footerLinks");
@@ -449,14 +593,22 @@
             <div class="card" style="padding:16px; grid-column: 1 / -1;">
               No recipes found yet. Add a file like <b>my-new-recipe.html</b>.
             </div>`;
+          renderFeatured(null);
+          document.getElementById("recipesPager").innerHTML = "";
           return;
         }
 
         const cards = await Promise.all(
           htmlFiles.map((fileName) => articleCardDataFor(fileName))
         );
+        const totalPages = Math.max(1, Math.ceil(cards.length / PAGE_SIZE));
+        const page = currentPage(totalPages);
+        const start = (page - 1) * PAGE_SIZE;
+        const visibleCards = cards.slice(start, start + PAGE_SIZE);
 
-        grid.innerHTML = cards.map(({ fileName, imageSrc, href, metaText }) => makeCard(fileName, imageSrc, href, metaText)).join("");
+        renderFeatured(visibleCards[0] || cards[0] || null);
+        grid.innerHTML = visibleCards.map(({ fileName, imageSrc, href, metaText }) => makeCard(fileName, imageSrc, href, metaText)).join("");
+        renderPager(cards.length, page);
 
       }catch(err){
         grid.innerHTML = `
@@ -464,6 +616,8 @@
             Recipes could not load. Refresh the page.<br/>
             <span style="color:${getComputedStyle(document.documentElement).getPropertyValue('--muted')}">${String(err)}</span>
           </div>`;
+        document.getElementById("recipesPager").innerHTML = "";
+        renderFeatured(null);
       }
     }
 
