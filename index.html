@@ -319,6 +319,7 @@
     // These pages should NOT show in recipes section
     const EXCLUDE = new Set([
       "index.html",
+      "recipe.html",
       "about.html",
       "privacy-policy.html",
       "terms-of-service.html"
@@ -340,16 +341,20 @@
       return "🍳";
     }
 
+    function recipeHref(fileName){
+      return `recipe.html?file=${encodeURIComponent(fileName)}`;
+    }
+
     function makeCard(fileName){
       const title = titleFromFilename(fileName);
       const icon = iconFor(fileName);
 
       return `
-        <a class="card recipe" href="${fileName}">
+        <a class="card recipe" href="${recipeHref(fileName)}">
           <div class="arrow">→</div>
           <div class="thumb">${icon}</div>
           <h3>${title}</h3>
-          <div class="meta">View recipe</div>
+          <div class="meta">Open styled recipe view</div>
           <div class="pillRow">
             <span class="pill">Recipe</span>
             <span class="pill">Easy</span>
