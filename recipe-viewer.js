@@ -32,6 +32,31 @@
     return file;
   }
 
+  function redirectTargetFromDocument(doc){
+    const refreshMeta = [...doc.querySelectorAll("meta")].find((meta) => {
+      return (meta.getAttribute("http-equiv") || "").toLowerCase() === "refresh";
+    });
+
+    if(refreshMeta){
+      const content = refreshMeta.getAttribute("content") || "";
+      const match = content.match(/url\s*=\s*([^;]+)/i);
+      if(match && match[1]){
+        return match[1].trim().replace(/^['"]|['"]$/g, "");
+      }
+    }
+
+    for(const script of doc.querySelectorAll("script")){
+      const text = script.textContent || "";
+      const match = text.match(/(?:window\.)?location\.(?:replace|assign)\(\s*["']([^"']+)["']\s*\)|(?:window\.)?location\.href\s*=\s*["']([^"']+)["']/i);
+      const target = match && (match[1] || match[2]);
+      if(target){
+        return target.trim();
+      }
+    }
+
+    return "";
+  }
+
   function maybeFixMojibake(text){
     if(!/[Ãâð]/.test(text)){
       return text;
@@ -407,6 +432,11 @@
 
       const raw = maybeFixMojibake(await response.text());
       const parsed = new DOMParser().parseFromString(raw, "text/html");
+      const redirectTarget = redirectTargetFromDocument(parsed);
+      if(redirectTarget){
+        window.location.replace(redirectTarget);
+        return;
+      }
       const sourceNodes = [...parsed.body.children].filter((node) => !["META", "SCRIPT", "STYLE"].includes(node.tagName));
       const { heroImage, intro, remaining } = extractIntro(sourceNodes);
       const facts = makeFactData(remaining, intro);

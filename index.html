@@ -350,15 +350,19 @@
       return `<div class="thumb">${icon}</div>`;
     }
 
-    function makeCard(fileName, imageSrc){
+    function recipeHref(fileName){
+      return `recipe.html?file=${encodeURIComponent(fileName)}`;
+    }
+
+    function makeCard(fileName, imageSrc, href, metaText){
       const title = titleFromFilename(fileName);
 
       return `
-        <a class="card recipe" href="${fileName}">
+        <a class="card recipe" href="${href}">
           <div class="arrow">→</div>
           ${cardVisual(fileName, imageSrc)}
           <h3>${title}</h3>
-          <div class="meta">View recipe</div>
+          <div class="meta">${metaText}</div>
           <div class="pillRow">
             <span class="pill">Recipe</span>
             <span class="pill">Easy</span>
@@ -368,15 +372,49 @@
       `;
     }
 
-    async function featuredImageFor(fileName){
+    function redirectTargetFromDocument(doc){
+      const refreshMeta = [...doc.querySelectorAll("meta")].find((meta) => {
+        return (meta.getAttribute("http-equiv") || "").toLowerCase() === "refresh";
+      });
+
+      if(refreshMeta){
+        const content = refreshMeta.getAttribute("content") || "";
+        const match = content.match(/url\s*=\s*([^;]+)/i);
+        if(match && match[1]){
+          return match[1].trim().replace(/^['"]|['"]$/g, "");
+        }
+      }
+
+      for(const script of doc.querySelectorAll("script")){
+        const text = script.textContent || "";
+        const match = text.match(/(?:window\.)?location\.(?:replace|assign)\(\s*["']([^"']+)["']\s*\)|(?:window\.)?location\.href\s*=\s*["']([^"']+)["']/i);
+        const target = match && (match[1] || match[2]);
+        if(target){
+          return target.trim();
+        }
+      }
+
+      return "";
+    }
+
+    async function articleCardDataFor(fileName){
       try{
         const res = await fetch(fileName, { cache: "no-store" });
-        if(!res.ok) return "";
+        if(!res.ok){
+          return { fileName, imageSrc: "", href: recipeHref(fileName), metaText: "Open styled recipe view" };
+        }
         const html = await res.text();
         const doc = new DOMParser().parseFromString(html, "text/html");
-        return doc.querySelector("figure img")?.getAttribute("src") || "";
+        const imageSrc = doc.querySelector("figure img")?.getAttribute("src") || "";
+        const redirectTarget = redirectTargetFromDocument(doc);
+        return {
+          fileName,
+          imageSrc,
+          href: redirectTarget ? fileName : recipeHref(fileName),
+          metaText: redirectTarget ? "View recipe" : "Open styled recipe view"
+        };
       }catch(_err){
-        return "";
+        return { fileName, imageSrc: "", href: recipeHref(fileName), metaText: "Open styled recipe view" };
       }
     }
 
@@ -415,13 +453,10 @@
         }
 
         const cards = await Promise.all(
-          htmlFiles.map(async (fileName) => ({
-            fileName,
-            imageSrc: await featuredImageFor(fileName)
-          }))
+          htmlFiles.map((fileName) => articleCardDataFor(fileName))
         );
 
-        grid.innerHTML = cards.map(({ fileName, imageSrc }) => makeCard(fileName, imageSrc)).join("");
+        grid.innerHTML = cards.map(({ fileName, imageSrc, href, metaText }) => makeCard(fileName, imageSrc, href, metaText)).join("");
 
       }catch(err){
         grid.innerHTML = `
